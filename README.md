@@ -52,7 +52,7 @@ The `key-management-service` serves as the centralized security hub. It generate
 
 Create a `.env` file in the root directory of the project:
 ```properties
-APP_SECURITY_MASTER_KEY=e+jyHosAiRY/lwgEx+XyiPFcQhlRKRKI51iT4kBG4y8=
+APP_SECURITY_MASTER_KEY=your_base64_encoded_256_bit_aes_master_key
 ```
 
 ### Database Environment Variables (Docker Compose Default)
@@ -128,12 +128,3 @@ Decrypts a composite payload matching the hybrid encryption format.
     "decryptedText": "My highly sensitive plaintext message"
   }
   ```
-
----
-
-## 🧪 Testing
-
-Run Mockito unit tests checking decryption behavior end-to-end (without requiring PostgreSQL/Docker):
-```bash
-$env:JAVA_HOME="C:\Users\victor.moreira1\.jdks\ms-21.0.10"; .\mvnw.cmd test -Dtest=KeyServiceTest
-```
