@@ -1,10 +1,10 @@
-# Key Management Service 🔑
+# Key Management Service
 
 A secure, independent microservice built with **Spring Boot** and **Java 21** designed to handle cryptographic key pair generation, secure database storage at rest, and hybrid payload decryption.
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 The `key-management-service` serves as the centralized security hub. It generates asymmetric key pairs, safely stores private keys, and handles the decapsulation/decryption of secure payloads.
 
@@ -37,7 +37,7 @@ The `key-management-service` serves as the centralized security hub. It generate
 
 ---
 
-## ✨ Features
+## Features
 
 - **RSA-2048 Key Generation**: Exposes public key for encryption.
 - **AES-GCM Encryption**: Secures private keys in the database.
@@ -48,7 +48,36 @@ The `key-management-service` serves as the centralized security hub. It generate
 
 ---
 
-## 🛠️ Configuration
+## Database Schema (crypto_keys)
+
+Below is the database table schema mapped to the `CryptoKey` entity for persisting key pairs:
+
+| Column | Data Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `UUID` | `PRIMARY KEY` | Unique identifier for the keypair (exposed as `keyId`). |
+| `public_key` | `TEXT` | `NULL` | Base64-encoded RSA-2048 public key. |
+| `private_key` | `TEXT` | `NULL` | Encrypted private key in the format `IV_Base64:Ciphertext_Base64`. |
+| `is_active` | `BOOLEAN` | `NULL` | Flag indicating whether the key is active (default is `true`). |
+| `created_at` | `TIMESTAMP` | `NULL` | Timestamp of the keypair creation. |
+
+---
+
+## Mapped Exceptions
+
+The service includes a global exception handler (`GlobalExceptionHandler`) to map Java exceptions to consistent HTTP error responses:
+
+| Exception | HTTP Status | Description |
+|---|---|---|
+| `KeyNotFoundException` | `404 Not Found` | Thrown when the specified `keyId` does not exist in the database. |
+| `IllegalArgumentException` | `400 Bad Request` | Thrown when the incoming payload format is malformed or has an invalid UUID. |
+| `IllegalStateException` | `400 Bad Request` | Thrown when attempting to decrypt using a deactivated key (`is_active = false`). |
+| `CryptographyException` | `500 Internal Server Error` | Thrown when a GCM, RSA, or AES decryption operation fails (e.g. corrupt bytes). |
+| `KeyGenerationException` | `500 Internal Server Error` | Thrown when the service fails to generate the RSA-2048 keypair. |
+| `Exception` | `500 Internal Server Error` | Thrown for any other unexpected runtime exceptions. |
+
+---
+
+## Configuration
 
 Create a `.env` file in the root directory of the project:
 ```properties
@@ -63,7 +92,7 @@ APP_SECURITY_MASTER_KEY=your_base64_encoded_256_bit_aes_master_key
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Java 21 JDK
@@ -91,7 +120,7 @@ The application will start and listen on port **`8081`**.
 
 ---
 
-## 📖 API Documentation
+## API Documentation
 
 ### 1. Generate Key Pair
 Generates a new RSA-2048 key pair, encrypts the private key, and stores it.
