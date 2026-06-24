@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -66,6 +67,54 @@ public class KeyService {
 
     private String encodeToBase64(byte[] bytes) {
         return Base64.getEncoder().encodeToString(bytes);
+    }
+
+    public String decryptPayload(String payload) {
+        if (payload == null || payload.isBlank()) {
+            throw new IllegalArgumentException("Payload cannot be empty");
+        }
+
+        String[] parts = payload.split("\\.");
+        if (parts.length != 3) {
+            throw new IllegalArgumentException("Invalid payload format. Expected format: KeyId.EncriptKey.EncriptText");
+        }
+
+        UUID keyId;
+        try {
+            keyId = UUID.fromString(parts[0]);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid KeyId format in payload", e);
+        }
+
+        String encryptedKeyBase64 = parts[1];
+        String encryptedTextBase64 = parts[2];
+
+        CryptoKey cryptoKey = findCryptoKey(keyId);
+        if (!Boolean.TRUE.equals(cryptoKey.getIsActive())) {
+            throw new IllegalStateException("The requested key is deactivated");
+        }
+
+        // 1. Decrypt private key stored in database
+        String privateKeyPem = cryptoService.decryptPrivateKey(cryptoKey.getPrivateKey());
+
+        // 2. Reconstruct RSA private key
+        PrivateKey rsaPrivateKey;
+        try {
+            byte[] privateKeyBytes = Base64.getDecoder().decode(privateKeyPem);
+            java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(privateKeyBytes);
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+            rsaPrivateKey = kf.generatePrivate(keySpec);
+        } catch (Exception e) {
+            throw new com.key_management_service.exception.CryptographyException("Error reconstructing private key", e);
+        }
+
+        // 3. Decrypt AES key with RSA private key
+        byte[] encryptedAesKeyBytes = Base64.getDecoder().decode(encryptedKeyBase64);
+        byte[] aesKeyBytes = cryptoService.decryptRsa(encryptedAesKeyBytes, rsaPrivateKey);
+
+        // 4. Decrypt content with AES key
+        byte[] combinedAesOutput = Base64.getDecoder().decode(encryptedTextBase64);
+        return cryptoService.decryptAes(combinedAesOutput, aesKeyBytes);
     }
 
     @Transactional
