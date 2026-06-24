@@ -42,19 +42,18 @@ public class KeyService {
 
             return new KeyResponseDTO(
                     savedCryptoKey.getId(),
-                    savedCryptoKey.getPublicKey()
-            );
+                    savedCryptoKey.getPublicKey());
 
         } catch (GeneralSecurityException exception) {
             throw new KeyGenerationException("Error generating key pair", exception);
         }
     }
 
-    private CryptoKey saveCryptoKey(CryptoKey cryptoKey){
+    private CryptoKey saveCryptoKey(CryptoKey cryptoKey) {
         return cryptoKeyRepository.save(cryptoKey);
     }
 
-    private CryptoKey findCryptoKey(UUID id){
+    private CryptoKey findCryptoKey(UUID id) {
         return cryptoKeyRepository.findById(id)
                 .orElseThrow(() -> new KeyNotFoundException("Key not found with ID: " + id));
     }
@@ -94,25 +93,22 @@ public class KeyService {
             throw new IllegalStateException("The requested key is deactivated");
         }
 
-        // 1. Decrypt private key stored in database
         String privateKeyPem = cryptoService.decryptPrivateKey(cryptoKey.getPrivateKey());
 
-        // 2. Reconstruct RSA private key
         PrivateKey rsaPrivateKey;
         try {
             byte[] privateKeyBytes = Base64.getDecoder().decode(privateKeyPem);
-            java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(privateKeyBytes);
+            java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(
+                    privateKeyBytes);
             java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
             rsaPrivateKey = kf.generatePrivate(keySpec);
         } catch (Exception e) {
             throw new com.key_management_service.exception.CryptographyException("Error reconstructing private key", e);
         }
 
-        // 3. Decrypt AES key with RSA private key
         byte[] encryptedAesKeyBytes = Base64.getDecoder().decode(encryptedKeyBase64);
         byte[] aesKeyBytes = cryptoService.decryptRsa(encryptedAesKeyBytes, rsaPrivateKey);
 
-        // 4. Decrypt content with AES key
         byte[] combinedAesOutput = Base64.getDecoder().decode(encryptedTextBase64);
         return cryptoService.decryptAes(combinedAesOutput, aesKeyBytes);
     }
